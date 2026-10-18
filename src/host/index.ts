@@ -207,10 +207,11 @@ function remember(map: Map<string, SessionState>, id: string, state: SessionStat
 }
 
 /**
- * 是否为「合格的人类消息」事件。
+ * 是否为「人类消息」事件（用户亲手发出的消息）。
  *
- * 判定条件与服务内部的 `sessionTitleUserMessageOf` 保持一致：类型是
- * `user/message` 且来源是用户（排除工具结果、系统注入等）。
+ * 只判类型与来源：`user/message` 且来源是用户（排除工具结果、系统注入等）。
+ * **不含**服务内部 `sessionTitleUserMessageOf` 那层「文本非空」过滤 —— 纯图片 /
+ * 纯附件消息也是一条人类消息；需要文本的调用方（`collectHumanMessages`）自己再滤。
  */
 function isEligibleUserMessage(event: SessionEvent): boolean {
   return event.type === 'user/message' && event.data.source.kind === 'user';
@@ -240,16 +241,25 @@ function collectHumanMessages(events: readonly SessionEvent[]): SessionTitleUser
 }
 
 /**
- * 标题里日期时间部件的锚点：**会话创建的瞬间**，不是「生成标题的那一刻」。
+ * 标题里日期时间部件的锚点：**第一条人类消息的时刻**，不是「生成标题的那一刻」，
+ * 也不是「会话记录创建的时刻」。
  *
- * 原来传 `new Date()`，于是每满 `retitleEvery` 条重算一次、日期就刷新一次：跨零点继续聊，
- * 同一个会话的 `MMDD` 当天就变了；对老会话敲 `/retitle` 也会把前缀跳到今天。
+ * 不能用 `header.createdAt`：dsh 在点「新对话」时就把会话建好并落盘（`createdAt`
+ * 就此定格，同时写三条 permission/preset、sandbox/mode、approval/policy 初始化事件），
+ * 空会话可以闲置好几天；之后它被「新对话」的复用逻辑接走（`dsh-client-ui-workspace`
+ * 的 `createInWorkspace` 优先复用 blank 会话），或从列表里打开，再发第一条消息时
+ * `createdAt` 仍是当初点按钮那天 —— 标题前缀于是退回好几天前（实机见过 12 天的）。
  *
- * `header.createdAt` 是存储层在创建会话时写死的 Unix 毫秒（恢复 / 重启读回同一个值），
- * 所以前缀稳定成「这段对话是哪天开的」，重算多少次都不动。
+ * 取首条人类消息的时刻：正常会话与 `createdAt` 几乎同秒，复用空会话则落在真正开始
+ * 对话那天。同一天内多次重算前缀稳定，跨零点继续聊也不跳 —— 两个要求同时成立。
+ *
+ * 还没有人类消息（只有工具 / 系统事件）时退回 `createdAt`。
  */
 function sessionStartedAt(session: SessionTitleProviderRequest['session']): Date {
-  return new Date(session.header.createdAt);
+  // 取「第一条人类消息」而不是服务认可的第一条可总结消息：日期表达的是这段对话
+  // 什么时候开始，纯图片消息也算开始（`isEligibleUserMessage` 刻意不带文本过滤）。
+  const first = session.snapshotEvents().find(isEligibleUserMessage);
+  return new Date(first?.time ?? session.header.createdAt);
 }
 
 class SessionTitlePatternProvider implements SessionTitleProvider {
@@ -348,7 +358,8 @@ class SessionTitlePatternProvider implements SessionTitleProvider {
           `model=${config.model || '(provider default)'}); rolling summaries cleared`,
       );
     }
-    // 日期锚点：会话创建时刻。用 `new Date()` 会让前缀随每次重算漂移（见 sessionStartedAt）。
+    // 日期锚点：首条人类消息的时刻。用 `new Date()` 会让前缀随每次重算漂移，用
+    // `header.createdAt` 会让复用的空会话退回点「新对话」那天（见 sessionStartedAt）。
     const createdAt = sessionStartedAt(request.session);
 
     const state = this.stateOf(request.session.id);
@@ -552,7 +563,7 @@ function registerPanelCommands(
       recordInput: false,
       handler: async ({ agent, signal }) => {
         const config = getConfig();
-        // 与自动生成同口径：草稿的日期也用会话创建时刻，否则预览与正式标题会差一天。
+        // 与自动生成同口径：草稿的日期也用首条人类消息的时刻，否则预览与正式标题会差一天。
         const createdAt = sessionStartedAt(agent.session);
         const messages = collectHumanMessages(agent.session.snapshotEvents());
         if (messages.length === 0) {

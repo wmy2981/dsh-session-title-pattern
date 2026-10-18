@@ -85,7 +85,7 @@ export const zh: Record<SessionTitlePatternLocaleKey, string> = {
   templateLabel: '标题格式',
   templateHint:
     '占位符：{YYYY} {MM} {DD} {HH} {mm} {ss} {type} {topic}。' +
-    '日期部件可任意拼接（如 {MMDD}、{YYYYMMDD}），日期取会话创建时间；' +
+    '日期部件可任意拼接（如 {MMDD}、{YYYYMMDD}），日期取首条消息的时间；' +
     '不写 {type} 就没有分类，不写 {topic} 就没有主题',
   maxBytesLabel: '标题长度上限',
   maxBytesHint: '单位字节，必须 ≤ session-title 的 maxTitleBytes（dsh-base 默认 80）',
@@ -138,8 +138,8 @@ export const en: Record<SessionTitlePatternLocaleKey, string> = {
   templateLabel: 'Title format',
   templateHint:
     'Placeholders: {YYYY} {MM} {DD} {HH} {mm} {ss} {type} {topic}. ' +
-    'Date parts can be combined freely (e.g. {MMDD}, {YYYYMMDD}) and come from the session ' +
-    'creation time; omit {type} to drop the type, omit {topic} to drop the topic.',
+    'Date parts can be combined freely (e.g. {MMDD}, {YYYYMMDD}) and come from the first ' +
+    'message of the session; omit {type} to drop the type, omit {topic} to drop the topic.',
   maxBytesLabel: 'Title length limit',
   maxBytesHint: 'In bytes; must be ≤ session-title maxTitleBytes (dsh-base default 80)',
   overridden: 'Custom',
