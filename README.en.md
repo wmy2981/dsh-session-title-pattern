@@ -27,7 +27,7 @@ MMDD ｜ type ｜ topic
 0913 ｜ 排查 ｜ DeepSeek-Harness login failure
 ```
 
-- **Date** — the day the session was **created**, four digits `MMDD` (your machine's **local** time zone, so no off-by-one day around midnight). It **does not drift when the title is recomputed**: keep chatting past midnight, or run `/retitle` later, and the prefix still shows the day this conversation started
+- **Date** — the day the session's **first message** was sent, four digits `MMDD` (your machine's **local** time zone, so no off-by-one day around midnight). It **does not drift when the title is recomputed**: keep chatting past midnight, or run `/retitle` later, and the prefix still shows the day this conversation started. It is also **not** the day you clicked "new chat": dsh creates the session right away, and a blank session can sit unused for days before its first message, so that creation day would be much earlier
 - **Type** — what the session is about, **following the interface language**: a Chinese UI gets two Chinese characters (排查 / 生成 / 配置…), an English UI gets a single word (Debug / Config / Docs) — an English conversation under a Chinese UI still gets a Chinese type
 - **Topic** — a summary of the **whole conversation**, not the first few characters of the first message
 
@@ -35,7 +35,7 @@ The format is yours to change; the default template is `{MMDD}｜{type}｜{topic
 
 | Placeholder | Meaning |
 | --- | --- |
-| `{YYYY}` `{MM}` `{DD}` `{HH}` `{mm}` `{ss}` | Date/time parts, **local time zone**, all taken from the **session creation moment**; freely combinable (`{YYYYMMDD}`, `{HHmmss}`) |
+| `{YYYY}` `{MM}` `{DD}` `{HH}` `{mm}` `{ss}` | Date/time parts, **local time zone**, all taken from the **first message of the session**; freely combinable (`{YYYYMMDD}`, `{HHmmss}`) |
 | `{type}` | Type. **Omit it and there is no type**; when it renders empty the whole segment disappears and the neighbouring separator goes with it |
 | `{topic}` | Topic. **Omit it and there is no topic**; it disappears the same way when empty |
 
