@@ -106,7 +106,7 @@ export function normalizeType(raw: string, lang: TypeLang): string {
 }
 
 /**
- * 系统提示词。
+ * 生成指令（**拼在 user 消息最前面**，不走 `system`，原因见 `callTitleModel`）。
  *
  * 类型语言**每次现算**（用户随时可能在设置里换语言环境），所以提示词按目标语言生成：
  * **类型严格按指定语言**，主线与主题跟随消息本身的语言。
@@ -114,7 +114,7 @@ export function normalizeType(raw: string, lang: TypeLang): string {
  * 两段示例里**总有一条是「消息语言 ≠ 类型语言」**的情形 —— 只靠一句文字说明压不住，
  * 模型照抄示例比照抄说明可靠得多（v0.5.22 踩过这个坑）。
  */
-function systemPrompt(typeLang: TypeLang): string {
+function instructionPrompt(typeLang: TypeLang): string {
   const typeRule =
     typeLang === 'zh'
       ? '  - 类型：**必须用中文**，两个汉字概括（例如「排查」「配置」「文档」），不要用英文单词。'
@@ -413,6 +413,14 @@ export function resolveRoute(settings: LlmSettings, request: SessionTitleProvide
  * `deadline` 组合超时与上游取消。`purpose` 是封闭枚举，辅助调用只能标
  * `session-title`。
  *
+ * **指令拼在 user 消息里，不用 `GenerateOptions.system`**（v0.8.11 实测）：
+ * OpenAI 兼容代理常常静默丢弃 `system` / `developer` 消息 —— workbuddy2api
+ * （`http://192.168.124.12:7863/v1`）就是如此，带 300 词 system 与不带 system 的
+ * `usage.prompt_tokens` 完全相同（58 vs 58），模型也照常答非所问。指令没到模型手上，
+ * 模型只会回一句普通标题、第二行不带 `|`，`{type}` 于是永远渲染成空 —— 表现就是
+ * 「标题里没有 type」。拼进 user 消息对任何供应商都成立，代价只是指令不再享受
+ * 供应商侧的 system 前缀缓存（几百字节，可忽略）。
+ *
  * @param typeLang - 本次「类型」该用哪种语言（提示词按它生成）。
  */
 export async function callTitleModel(
@@ -434,11 +442,10 @@ export async function callTitleModel(
       model: route.model,
       messages: [
         createUserMessage({
-          content: [{ type: 'text', text: input }],
+          content: [{ type: 'text', text: `${instructionPrompt(typeLang)}\n\n${input}` }],
           source: { kind: 'dsh-session-title-pattern' },
         }),
       ],
-      system: systemPrompt(typeLang),
       maxTokens: settings.maxOutputTokens,
       sessionId: request.session.id,
       purpose: 'session-title',
